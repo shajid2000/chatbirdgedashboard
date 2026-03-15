@@ -1,0 +1,87 @@
+/* ============================================================
+   DESIGN TOKENS — source of truth for all branding
+   To rebrand: edit this file only.
+   To white-label per tenant: inject overrides via <style> tag.
+   ============================================================ */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────── */
+  --brand-primary:        210 100% 56%;   /* blue */
+  --brand-primary-hover:  210 100% 48%;
+  --brand-secondary:      262 80% 60%;    /* violet */
+  --brand-accent:         160 84% 39%;    /* emerald */
+
+  /* ── Layout surfaces ────────────────────────────────────── */
+  --surface-app:          220 20% 97%;    /* overall page bg */
+  --surface-sidebar:      220 20% 13%;   /* inbox sidebar bg */
+  --surface-sidebar-item: 220 20% 18%;   /* hovered inbox row */
+  --surface-sidebar-active:220 20% 22%;  /* selected inbox row */
+  --surface-chat:         0 0% 100%;     /* chat area bg */
+  --surface-panel:        220 20% 98%;   /* right profile panel */
+  --surface-input:        0 0% 100%;     /* message input bar bg */
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --text-primary:         220 20% 10%;
+  --text-secondary:       220 10% 46%;
+  --text-muted:           220 10% 65%;
+  --text-on-brand:        0 0% 100%;     /* text on brand bg */
+  --text-sidebar:         220 20% 88%;   /* text on dark sidebar */
+  --text-sidebar-muted:   220 10% 58%;
+
+  /* ── Message bubbles ────────────────────────────────────── */
+  --bubble-in-bg:         220 20% 94%;   /* customer message */
+  --bubble-in-text:       220 20% 10%;
+  --bubble-out-bg:        210 100% 56%;  /* agent message — uses brand */
+  --bubble-out-text:      0 0% 100%;
+
+  /* ── Borders ────────────────────────────────────────────── */
+  --border-default:       220 15% 90%;
+  --border-sidebar:       220 15% 22%;
+
+  /* ── Channel badge colors ───────────────────────────────── */
+  --channel-whatsapp:     142 70% 40%;
+  --channel-instagram:    329 80% 55%;
+  --channel-messenger:    210 100% 56%;
+  --channel-webchat:      262 80% 60%;
+  --channel-email:        4 86% 58%;
+
+  /* ── Status colors ──────────────────────────────────────── */
+  --status-open:          160 84% 39%;
+  --status-pending:       38 92% 50%;
+  --status-resolved:      220 10% 65%;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-sans:            'Inter', system-ui, sans-serif;
+  --font-size-xs:         0.75rem;
+  --font-size-sm:         0.875rem;
+  --font-size-base:       1rem;
+  --font-size-lg:         1.125rem;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm:            0.375rem;
+  --radius-md:            0.5rem;
+  --radius-lg:            0.75rem;
+  --radius-bubble:        1rem;
+  --radius-bubble-tail:   0.25rem;
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-card:          0 1px 3px 0 rgb(0 0 0 / 0.08);
+  --shadow-panel:         -1px 0 0 0 hsl(var(--border-default));
+}
+
+/* ── Dark mode token overrides ──────────────────────────── */
+.dark {
+  --surface-app:          220 20% 8%;
+  --surface-chat:         220 20% 10%;
+  --surface-panel:        220 20% 12%;
+  --surface-input:        220 20% 14%;
+
+  --text-primary:         220 20% 95%;
+  --text-secondary:       220 10% 65%;
+  --text-muted:           220 10% 45%;
+
+  --bubble-in-bg:         220 20% 18%;
+  --bubble-in-text:       220 20% 92%;
+
+  --border-default:       220 15% 20%;
+}
