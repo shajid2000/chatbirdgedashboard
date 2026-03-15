@@ -291,7 +291,7 @@ function OAuthConnectButton({ source, label, icon, disabled, onConnected }) {
         <PagePickerModal
           pages={pages}
           onSelect={handlePageSelect}
-          onClose={() => { setPages(null); setPendingConn(null) }}
+          onClose={() => setPages(null)}
         />
       )}
     </>

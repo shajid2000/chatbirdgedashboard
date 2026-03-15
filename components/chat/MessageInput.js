@@ -35,8 +35,9 @@ export default function MessageInput({ customerId, lastChannelType, lastChannelI
     if (!text || sending) return
     setSending(true)
     try {
-      // Pass channel_id only if agent overrode the default
-      const channelId = selectedChannelId || null
+      // Always send the resolved channel id so the backend never falls back
+      // to a null last_channel (e.g. first outbound message to a new customer)
+      const channelId = selectedChannel?.id || null
       onSend(text, channelId)
       setContent('')
       setSelectedChannelId(null)

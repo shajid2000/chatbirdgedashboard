@@ -4,12 +4,33 @@ import { getAccessToken } from '@/lib/auth'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL
 
-function createReconnectingSocket({ url, onMessage, onOpen, onClose }) {
+function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
   let ws = null
   let destroyed = false
 
+  function _clearSocket() {
+    if (!ws) return
+    // Remove all handlers before closing so stale events don't fire
+    ws.onopen = null
+    ws.onmessage = null
+    ws.onclose = null
+    ws.onerror = null
+    if (ws.readyState !== WebSocket.CLOSED) ws.close()
+    ws = null
+  }
+
   function connect() {
     if (destroyed) return
+    // Already open or mid-handshake — don't create a second socket
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
+
+    // If a stale / closing socket remains, clean it up before reconnecting
+    if (ws) _clearSocket()
+
+    // Fetch a fresh URL (and fresh token) on every connect attempt
+    const url = getUrl()
+    if (!url) return
+
     ws = new WebSocket(url)
 
     ws.onopen = () => {
@@ -26,25 +47,29 @@ function createReconnectingSocket({ url, onMessage, onOpen, onClose }) {
     }
 
     ws.onclose = (e) => {
-      console.log('[WS] closed', e.code)
+      console.log('[WS] closed', e.code, url)
+      ws = null   // allow next connect() to create a fresh socket
       onClose?.()
     }
 
-    ws.onerror = () => ws.close()
+    ws.onerror = (e) => {
+      console.warn('[WS] error', url, e)
+      _clearSocket()
+    }
   }
 
   function disconnect() {
-    if (ws && ws.readyState !== WebSocket.CLOSED) {
-      ws.close()
-    }
+    _clearSocket()
   }
 
   function destroy() {
     destroyed = true
-    disconnect()
+    _clearSocket()
   }
 
   function send(data) {
+    console.log(ws,data);
+    
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data))
       return true
@@ -65,13 +90,13 @@ export function useChatSocket(customerId, onMessage) {
 
   useEffect(() => {
     if (!customerId) return
-    const token = getAccessToken()
-    if (!token) return
-
-    const url = `${WS_URL}/ws/customers/${customerId}/?token=${token}`
 
     socketRef.current = createReconnectingSocket({
-      url,
+      getUrl: () => {
+        const token = getAccessToken()
+        if (!token) return null
+        return `${WS_URL}/ws/customers/${customerId}/?token=${token}`
+      },
       onMessage: (data) => {
         if (data.type === 'message') {
           queryClient.setQueryData(['messages', customerId], (old) =>
@@ -104,6 +129,7 @@ export function useChatSocket(customerId, onMessage) {
   }, [customerId])
 
   const sendMessage = useCallback((content, channelId = null) => {
+    console.log('[WS] sending message', { content, channelId },socketRef.current)
     socketRef.current?.send({ content, channel_id: channelId })
   }, [])
 
@@ -120,13 +146,12 @@ export function useInboxSocket(onUpdate) {
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    const token = getAccessToken()
-    if (!token) return
-
-    const url = `${WS_URL}/ws/inbox/?token=${token}`
-
     socketRef.current = createReconnectingSocket({
-      url,
+      getUrl: () => {
+        const token = getAccessToken()
+        if (!token) return null
+        return `${WS_URL}/ws/inbox/?token=${token}`
+      },
       onMessage: (data) => {
         if (data.type === 'inbox_update') {
           queryClient.invalidateQueries({ queryKey: ['customers'] })
