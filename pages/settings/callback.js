@@ -15,8 +15,10 @@ export default function OAuthCallback() {
     if (typeof window === 'undefined') return
 
     try {
+      const source = localStorage.getItem('oauth_pending_source') ?? null
+      localStorage.removeItem('oauth_pending_source')
       window.opener?.postMessage(
-        { type: 'meta_oauth_callback', url: window.location.href },
+        { type: 'meta_oauth_callback', url: window.location.href, source },
         window.location.origin,
       )
     } catch (_) {

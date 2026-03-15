@@ -179,6 +179,8 @@ function OAuthConnectButton({ source, label, icon, disabled, onConnected }) {
     const handler = async (event) => {
       if (event.origin !== window.location.origin) return
       if (event.data?.type !== 'meta_oauth_callback') return
+      // Guard: only handle the message intended for this button's source
+      if (event.data?.source !== source) return
 
       const fullUrl = event.data.url
       if (!fullUrl) return
@@ -216,6 +218,8 @@ function OAuthConnectButton({ source, label, icon, disabled, onConnected }) {
       const width = 600, height = 700
       const left = window.screenX + (window.outerWidth - width) / 2
       const top = window.screenY + (window.outerHeight - height) / 2
+      // Tag which source initiated this popup so the callback can echo it back
+      localStorage.setItem('oauth_pending_source', source)
       popupRef.current = window.open(
         login_url,
         'meta-oauth',
