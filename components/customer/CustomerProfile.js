@@ -2,7 +2,6 @@ import { useCustomer, useUpdateStatus, useAssignAgent } from '@/hooks/useCustome
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 import { toast } from 'sonner'
@@ -20,7 +19,7 @@ const STATUS_COLORS = {
   resolved: 'var(--color-status-resolved)',
 }
 
-export default function CustomerProfile({ customerId }) {
+export default function CustomerProfile({ customerId, onClose }) {
   const { data: customer } = useCustomer(customerId)
   const updateStatus = useUpdateStatus(customerId)
   const assignAgent = useAssignAgent(customerId)
@@ -35,7 +34,7 @@ export default function CustomerProfile({ customerId }) {
   })
 
   if (!customer) return (
-    <div className="w-64 bg-surface-panel border-l border-border-default" />
+    <div className="w-72 md:w-64 bg-surface-panel border-l border-border-default h-full" />
   )
 
   const handleStatusChange = async (status) => {
@@ -58,11 +57,25 @@ export default function CustomerProfile({ customerId }) {
 
   return (
     <div
-      className="w-64 flex flex-col bg-surface-panel border-l border-border-default overflow-y-auto"
+      className="w-72 md:w-64 flex flex-col bg-surface-panel border-l border-border-default overflow-y-auto h-full"
       style={{ boxShadow: 'var(--shadow-panel)' }}
     >
+      {/* Header with close button */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide">Profile</p>
+        <button
+          onClick={onClose}
+          className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
+          title="Close profile"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
       {/* Avatar + name */}
-      <div className="flex flex-col items-center px-4 pt-6 pb-4 text-center">
+      <div className="flex flex-col items-center px-4 pt-2 pb-4 text-center">
         <Avatar className="h-14 w-14 mb-3">
           <AvatarFallback className="bg-brand/20 text-brand text-lg font-semibold">
             {initials(customer.name)}

@@ -1,4 +1,5 @@
 import ChannelBadge from '@/components/shared/ChannelBadge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -12,9 +13,31 @@ function isSameGroup(msg, prev) {
   )
 }
 
+function ErrorIcon({ error }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className="flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white flex-shrink-0"
+          aria-label="Send error"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-2.5 h-2.5">
+            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 3.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4.5zm0 6.5a.875.875 0 1 1 0-1.75A.875.875 0 0 1 8 11z" />
+          </svg>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[240px]">
+        <p className="font-semibold text-red-400 mb-0.5">Failed to deliver</p>
+        <p className="text-xs opacity-90 leading-snug">{error}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export default function MessageBubble({ message, prevMessage }) {
   const isOut = message.speaker === 'agent' || message.speaker === 'bot'
   const grouped = isSameGroup(message, prevMessage)
+  const hasError = !!message.send_error
 
   return (
     <div className={`flex flex-col ${isOut ? 'items-end' : 'items-start'} ${grouped ? 'mt-0.5' : 'mt-3'}`}>
@@ -33,27 +56,37 @@ export default function MessageBubble({ message, prevMessage }) {
         </div>
       )}
 
-      {/* Bubble */}
-      <div
-        className="max-w-[72%] px-3.5 py-2 text-sm leading-relaxed"
-        style={{
-          backgroundColor: isOut
-            ? 'hsl(var(--bubble-out-bg))'
-            : 'hsl(var(--bubble-in-bg))',
-          color: isOut
-            ? 'hsl(var(--bubble-out-text))'
-            : 'hsl(var(--bubble-in-text))',
-          borderRadius: isOut
-            ? 'var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble)'
-            : 'var(--radius-bubble-tail) var(--radius-bubble) var(--radius-bubble) var(--radius-bubble)',
-        }}
-      >
-        {message.content}
+      {/* Bubble + error icon row */}
+      <div className={`flex items-end gap-1.5 ${isOut ? 'flex-row-reverse' : ''}`}>
+        <div
+          className="max-w-[72wh] px-3.5 py-2 text-sm leading-relaxed break-words"
+          style={{
+            backgroundColor: hasError
+              ? 'hsl(0 60% 96%)'
+              : isOut
+              ? 'hsl(var(--bubble-out-bg))'
+              : 'hsl(var(--bubble-in-bg))',
+            color: hasError
+              ? 'hsl(0 50% 35%)'
+              : isOut
+              ? 'hsl(var(--bubble-out-text))'
+              : 'hsl(var(--bubble-in-text))',
+            borderRadius: isOut
+              ? '1rem 0.375rem 1rem 1rem'
+              : '0.375rem 1rem 1rem 1rem',
+            border: hasError ? '1px solid hsl(0 60% 85%)' : undefined,
+          }}
+        >
+          {message.content}
+        </div>
+
+        {hasError && <ErrorIcon error={message.send_error} />}
       </div>
 
       {/* Timestamp */}
       <span className="text-[10px] text-text-muted mt-0.5 px-1">
         {formatTime(message.timestamp)}
+        {hasError && <span className="text-red-400 ml-1">· not delivered</span>}
       </span>
     </div>
   )

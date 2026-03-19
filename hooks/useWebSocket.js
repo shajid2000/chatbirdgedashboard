@@ -4,13 +4,17 @@ import { getAccessToken } from '@/lib/auth'
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL
 
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000] // ms, capped at last value
+
 function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
   let ws = null
   let destroyed = false
+  let reconnectTimer = null
+  let retryCount = 0
+  let manualDisconnect = false  // true when disconnect() is called intentionally
 
   function _clearSocket() {
     if (!ws) return
-    // Remove all handlers before closing so stale events don't fire
     ws.onopen = null
     ws.onmessage = null
     ws.onclose = null
@@ -19,15 +23,22 @@ function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
     ws = null
   }
 
+  function _scheduleReconnect() {
+    if (destroyed || manualDisconnect) return
+    const delay = RECONNECT_DELAYS[Math.min(retryCount, RECONNECT_DELAYS.length - 1)]
+    retryCount++
+    console.log(`[WS] reconnecting in ${delay}ms (attempt ${retryCount})`)
+    reconnectTimer = setTimeout(connect, delay)
+  }
+
   function connect() {
     if (destroyed) return
-    // Already open or mid-handshake — don't create a second socket
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
+    clearTimeout(reconnectTimer)
+    manualDisconnect = false
 
-    // If a stale / closing socket remains, clean it up before reconnecting
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
     if (ws) _clearSocket()
 
-    // Fetch a fresh URL (and fresh token) on every connect attempt
     const url = getUrl()
     if (!url) return
 
@@ -35,6 +46,7 @@ function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
 
     ws.onopen = () => {
       console.log('[WS] connected:', url)
+      retryCount = 0  // reset backoff on successful connect
       onOpen?.()
     }
 
@@ -48,8 +60,9 @@ function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
 
     ws.onclose = (e) => {
       console.log('[WS] closed', e.code, url)
-      ws = null   // allow next connect() to create a fresh socket
+      ws = null
       onClose?.()
+      _scheduleReconnect()
     }
 
     ws.onerror = (e) => {
@@ -59,17 +72,18 @@ function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
   }
 
   function disconnect() {
+    manualDisconnect = true
+    clearTimeout(reconnectTimer)
     _clearSocket()
   }
 
   function destroy() {
     destroyed = true
+    clearTimeout(reconnectTimer)
     _clearSocket()
   }
 
   function send(data) {
-    console.log(ws,data);
-    
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data))
       return true
@@ -154,7 +168,27 @@ export function useInboxSocket(onUpdate) {
       },
       onMessage: (data) => {
         if (data.type === 'inbox_update') {
+          const { customer_id, message } = data
+
+          // Immediately update all ['customers', *] caches:
+          // - inject _lastMessage preview
+          // - update last_message_at so the row re-renders instantly
+          // - bubble the customer to the top (re-sort by last_message_at desc)
+          queryClient.setQueriesData({ queryKey: ['customers'] }, (old) => {
+            if (!Array.isArray(old)) return old
+            const updated = old.map((c) =>
+              c.id === customer_id
+                ? { ...c, last_message_at: message.timestamp, _lastMessage: message }
+                : c
+            )
+            return updated.sort(
+              (a, b) => new Date(b.last_message_at) - new Date(a.last_message_at)
+            )
+          })
+
+          // Background refetch to sync full server state
           queryClient.invalidateQueries({ queryKey: ['customers'] })
+
           onUpdate?.(data)
         }
       },

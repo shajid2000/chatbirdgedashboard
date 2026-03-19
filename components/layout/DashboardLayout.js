@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import InboxSidebar from '@/components/inbox/InboxSidebar'
 import { useInboxSocket } from '@/hooks/useWebSocket'
+import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Inbox', icon: (
@@ -24,7 +25,7 @@ const NAV_ITEMS = [
   )},
 ]
 
-export default function DashboardLayout({ children, selectedCustomerId, onSelectCustomer }) {
+export default function DashboardLayout({ children, selectedCustomerId, onSelectCustomer, sidebarOpen, onToggleSidebar }) {
   const { user, loading, logout } = useAuth()
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -43,22 +44,27 @@ export default function DashboardLayout({ children, selectedCustomerId, onSelect
     <div className="flex h-screen bg-surface-app overflow-hidden">
 
       {/* Far left: icon nav */}
-      <div className="w-14 flex flex-col items-center py-4 gap-1 bg-surface-sidebar border-r border-border-sidebar">
-        {/* Logo */}
-        <div className="w-8 h-8 rounded-[var(--radius-md)] bg-brand flex items-center justify-center mb-3">
+      <div className="w-14 flex flex-col items-center py-4 gap-1 bg-surface-sidebar border-r border-border-sidebar shrink-0 z-50">
+        {/* Logo / sidebar toggle on desktop */}
+        <button
+          onClick={onToggleSidebar}
+          className="w-8 h-8 rounded-[var(--radius-md)] bg-brand flex items-center justify-center mb-3 hover:opacity-90 transition-opacity"
+          title="Toggle sidebar"
+        >
           <span className="text-text-on-brand font-bold text-sm">U</span>
-        </div>
+        </button>
 
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
             title={item.label}
-            className={`w-9 h-9 flex items-center justify-center rounded-[var(--radius-md)] transition-colors ${
+            className={cn(
+              'w-9 h-9 flex items-center justify-center rounded-[var(--radius-md)] transition-colors',
               router.pathname === item.href
                 ? 'bg-brand text-text-on-brand'
                 : 'text-text-sidebar-muted hover:text-text-sidebar hover:bg-surface-sidebar-item'
-            }`}
+            )}
           >
             {item.icon}
           </Link>
@@ -89,17 +95,38 @@ export default function DashboardLayout({ children, selectedCustomerId, onSelect
         </button>
       </div>
 
-      {/* Inbox sidebar — only on dashboard */}
-      {isDashboard && (
-        <InboxSidebar
-          user={user}
-          selectedCustomerId={selectedCustomerId}
-          onSelectCustomer={onSelectCustomer}
+      {/* Mobile backdrop for sidebar */}
+      {isDashboard && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={onToggleSidebar}
         />
       )}
 
+      {/* Inbox sidebar — only on dashboard */}
+      {isDashboard && (
+        <div
+          className={cn(
+            // Mobile: fixed drawer that slides in from the left (after icon nav)
+            'fixed inset-y-0 left-14 z-40 transition-transform duration-200',
+            // Desktop: back to normal layout flow
+            'md:static md:inset-auto md:z-auto md:transition-none',
+            sidebarOpen
+              ? 'translate-x-0'
+              : '-translate-x-full md:-translate-x-px md:hidden'
+          )}
+        >
+          <InboxSidebar
+            user={user}
+            selectedCustomerId={selectedCustomerId}
+            onSelectCustomer={onSelectCustomer}
+            onClose={onToggleSidebar}
+          />
+        </div>
+      )}
+
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
         {children}
       </div>
     </div>

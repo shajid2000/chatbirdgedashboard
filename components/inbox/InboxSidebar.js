@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useCustomers } from '@/hooks/useCustomers'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 
@@ -26,7 +25,7 @@ function initials(name) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function InboxSidebar({ user, selectedCustomerId, onSelectCustomer }) {
+export default function InboxSidebar({ user, selectedCustomerId, onSelectCustomer, onClose }) {
   const [statusFilter, setStatusFilter] = useState('')
   const { data: customers = [], isLoading } = useCustomers(statusFilter ? { status: statusFilter } : {})
 
@@ -34,9 +33,21 @@ export default function InboxSidebar({ user, selectedCustomerId, onSelectCustome
     <div className="w-72 flex flex-col bg-surface-sidebar border-r border-border-sidebar h-full">
 
       {/* Header */}
-      <div className="px-4 py-4">
-        <p className="text-sm font-semibold text-text-sidebar">{user?.business?.name}</p>
-        <p className="text-xs text-text-sidebar-muted">{user?.full_name}</p>
+      <div className="px-4 py-4 flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text-sidebar truncate">{user?.business?.name}</p>
+          <p className="text-xs text-text-sidebar-muted truncate">{user?.full_name}</p>
+        </div>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="ml-2 shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-sidebar-muted hover:text-text-sidebar hover:bg-surface-sidebar-item transition-colors"
+          title="Close sidebar"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
       </div>
 
       <Separator className="bg-border-sidebar" />
@@ -97,13 +108,17 @@ export default function InboxSidebar({ user, selectedCustomerId, onSelectCustome
                 {customer.last_channel_type && (
                   <ChannelBadge type={customer.last_channel_type} size="xs" />
                 )}
-                <span className="text-xs text-text-sidebar-muted truncate">
-                  {customer.status !== 'open' && (
-                    <span className={`mr-1 ${customer.status === 'pending' ? 'text-status-pending' : 'text-status-resolved'}`}>
-                      {customer.status}
-                    </span>
-                  )}
-                </span>
+                {customer.status !== 'open' && (
+                  <span className={`text-[10px] shrink-0 ${customer.status === 'pending' ? 'text-status-pending' : 'text-status-resolved'}`}>
+                    {customer.status}
+                  </span>
+                )}
+                {customer._lastMessage && (
+                  <span className="text-xs text-text-sidebar-muted truncate">
+                    {customer._lastMessage.speaker === 'agent' ? 'You: ' : ''}
+                    {customer._lastMessage.content}
+                  </span>
+                )}
               </div>
             </div>
           </button>

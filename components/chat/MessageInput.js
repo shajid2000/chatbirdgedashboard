@@ -126,9 +126,9 @@ export default function MessageInput({ customerId, lastChannelType, lastChannelI
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+          placeholder="Type a message…"
           rows={1}
-          className="flex-1 resize-none rounded-[var(--radius-md)] border border-border-default bg-surface-app px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/30 min-h-[40px] max-h-32 overflow-y-auto"
+          className="flex-1 resize-none rounded-[var(--radius-md)] border border-border-default bg-surface-app px-3 py-2 text-xs sm:text-sm md:text-sm text-text-primary placeholder:text-text-muted placeholder:text-xs placeholder:sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 min-h-[36px] sm:min-h-[40px] max-h-32 overflow-y-auto"
           onInput={(e) => {
             e.target.style.height = 'auto'
             e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px'
