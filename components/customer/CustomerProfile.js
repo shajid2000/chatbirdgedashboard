@@ -1,15 +1,13 @@
-import { useCustomer, useUpdateStatus, useAssignAgent } from '@/hooks/useCustomers'
+import { useState } from 'react'
+import { useCustomer, useUpdateCustomer, useUpdateStatus, useAssignAgent } from '@/hooks/useCustomers'
+import MergeModal from './MergeModal'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 import { toast } from 'sonner'
-
-function initials(name) {
-  if (!name) return '?'
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-}
+import { customerDisplayName, customerInitials } from '@/lib/utils'
 
 const STATUS_OPTIONS = ['open', 'pending', 'resolved']
 
@@ -23,6 +21,12 @@ export default function CustomerProfile({ customerId, onClose }) {
   const { data: customer } = useCustomer(customerId)
   const updateStatus = useUpdateStatus(customerId)
   const assignAgent = useAssignAgent(customerId)
+  const updateCustomer = useUpdateCustomer(customerId)
+
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({ name: '', phone: '', email: '' })
+  const [saving, setSaving] = useState(false)
+  const [merging, setMerging] = useState(false)
 
   const { data: teamMembers = [] } = useQuery({
     queryKey: ['team-members'],
@@ -36,6 +40,32 @@ export default function CustomerProfile({ customerId, onClose }) {
   if (!customer) return (
     <div className="w-72 md:w-64 bg-surface-panel border-l border-border-default h-full" />
   )
+
+  function startEdit() {
+    setForm({ name: customer.name || '', phone: customer.phone || '', email: customer.email || '' })
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+  }
+
+  async function saveEdit() {
+    setSaving(true)
+    try {
+      await updateCustomer.mutateAsync(form)
+      toast.success('Customer updated')
+      setEditing(false)
+    } catch {
+      toast.error('Failed to update customer.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Escape') cancelEdit()
+  }
 
   const handleStatusChange = async (status) => {
     try {
@@ -55,35 +85,107 @@ export default function CustomerProfile({ customerId, onClose }) {
     }
   }
 
+  const displayName = customerDisplayName(customer)
+
   return (
     <div
       className="w-72 md:w-64 flex flex-col bg-surface-panel border-l border-border-default overflow-y-auto h-full"
       style={{ boxShadow: 'var(--shadow-panel)' }}
     >
-      {/* Header with close button */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide">Profile</p>
-        <button
-          onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
-          title="Close profile"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          {!editing && (
+            <>
+              <button
+                onClick={startEdit}
+                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
+                title="Edit customer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setMerging(true)}
+                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
+                title="Merge duplicate customer"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </button>
+            </>
+          )}
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
+            title="Close profile"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Avatar + name */}
+      {/* Avatar + info */}
       <div className="flex flex-col items-center px-4 pt-2 pb-4 text-center">
         <Avatar className="h-14 w-14 mb-3">
           <AvatarFallback className="bg-brand/20 text-brand text-lg font-semibold">
-            {initials(customer.name)}
+            {customerInitials(customer)}
           </AvatarFallback>
         </Avatar>
-        <p className="font-semibold text-text-primary text-sm">{customer.name || 'Unknown'}</p>
-        {customer.phone && <p className="text-xs text-text-muted mt-0.5">{customer.phone}</p>}
-        {customer.email && <p className="text-xs text-text-muted">{customer.email}</p>}
+
+        {editing ? (
+          <div className="w-full space-y-2" onKeyDown={handleKey}>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full text-sm px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-surface-app border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand/50"
+            />
+            <input
+              type="text"
+              placeholder="Phone"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              className="w-full text-sm px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-surface-app border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand/50"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              className="w-full text-sm px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-surface-app border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand/50"
+            />
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="flex-1 text-xs py-1.5 rounded-[var(--radius-sm)] bg-brand text-text-on-brand font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={cancelEdit}
+                disabled={saving}
+                className="flex-1 text-xs py-1.5 rounded-[var(--radius-sm)] border border-border-default text-text-muted hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="font-semibold text-text-primary text-sm">{displayName}</p>
+            {customer.phone && <p className="text-xs text-text-muted mt-0.5">{customer.phone}</p>}
+            {customer.email && <p className="text-xs text-text-muted">{customer.email}</p>}
+          </>
+        )}
       </div>
 
       <Separator className="bg-border-default" />
@@ -159,6 +261,17 @@ export default function CustomerProfile({ customerId, onClose }) {
           </div>
         </div>
       </div>
+
+      {merging && (
+        <MergeModal
+          customer={customer}
+          onClose={() => setMerging(false)}
+          onMerged={() => {
+            setMerging(false)
+            onClose?.()
+          }}
+        />
+      )}
     </div>
   )
 }

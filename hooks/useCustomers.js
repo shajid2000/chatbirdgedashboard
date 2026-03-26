@@ -1,12 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
-export function useCustomers(filters = {}) {
-  return useQuery({
+export function useInfiniteCustomers(filters = {}) {
+  return useInfiniteQuery({
     queryKey: ['customers', filters],
-    queryFn: async () => {
-      const { data } = await api.get('/customers/', { params: filters })
-      return data
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data } = await api.get('/customers/', { params: { ...filters, page: pageParam } })
+      return data // { count, next, previous, results }
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.next) return undefined
+      const url = new URL(lastPage.next)
+      return Number(url.searchParams.get('page'))
     },
   })
 }
@@ -51,6 +57,18 @@ export function useUpdateStatus(customerId) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
+    },
+  })
+}
+
+export function useMergeCustomer(customerId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (mergeIds) => api.post(`/customers/${customerId}/merge/`, { merge_ids: mergeIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['messages', customerId] })
     },
   })
 }

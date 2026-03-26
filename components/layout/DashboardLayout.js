@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -30,11 +30,58 @@ export default function DashboardLayout({ children, selectedCustomerId, onSelect
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
 
+  // Unread counts and last messages kept outside the React Query cache so server
+  // refetches don't wipe them. Easy to extend into a notification system later.
+  const [unreadCounts, setUnreadCounts] = useState({})
+  const [lastMessages, setLastMessages] = useState({})
+
+  // Ref so useInboxSocket can read the current selection without reconnecting
+  const selectedCustomerIdRef = useRef(selectedCustomerId)
+  useEffect(() => {
+    selectedCustomerIdRef.current = selectedCustomerId
+  }, [selectedCustomerId])
+
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
   }, [user, loading])
 
-  useInboxSocket()
+  useInboxSocket((data) => {
+    if (data.type === 'customer_merged') {
+      const { primary_id, merged_ids } = data
+      // Remove merged secondaries from local state
+      setUnreadCounts((prev) => {
+        const next = { ...prev }
+        merged_ids.forEach((id) => delete next[id])
+        return next
+      })
+      setLastMessages((prev) => {
+        const next = { ...prev }
+        merged_ids.forEach((id) => delete next[id])
+        return next
+      })
+      // If the agent is viewing a secondary that got merged, redirect to primary
+      if (merged_ids.includes(selectedCustomerIdRef.current)) {
+        onSelectCustomer(primary_id)
+      }
+      return
+    }
+
+    const { customer_id, message } = data
+    // Always update last message preview
+    setLastMessages((prev) => ({ ...prev, [customer_id]: message }))
+    // Only count inbound messages from customers when that chat isn't open
+    if (message.speaker === 'customer' && selectedCustomerIdRef.current !== customer_id) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [customer_id]: (prev[customer_id] || 0) + 1,
+      }))
+    }
+  })
+
+  function handleSelectCustomer(id) {
+    setUnreadCounts((prev) => ({ ...prev, [id]: 0 }))
+    onSelectCustomer(id)
+  }
 
   if (loading || !user) return null
 
@@ -119,7 +166,9 @@ export default function DashboardLayout({ children, selectedCustomerId, onSelect
           <InboxSidebar
             user={user}
             selectedCustomerId={selectedCustomerId}
-            onSelectCustomer={onSelectCustomer}
+            onSelectCustomer={handleSelectCustomer}
+            unreadCounts={unreadCounts}
+            lastMessages={lastMessages}
             onClose={onToggleSidebar}
           />
         </div>

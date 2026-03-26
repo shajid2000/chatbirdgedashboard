@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useMessages } from '@/hooks/useMessages'
 import { useChatSocket } from '@/hooks/useWebSocket'
 import { useCustomer } from '@/hooks/useCustomers'
@@ -15,9 +15,17 @@ function initials(name) {
 }
 
 export default function ChatWindow({ customerId, onBack }) {
+  const scrollRef = useRef(null)
   const bottomRef = useRef(null)
+  const topSentinelRef = useRef(null)
   const { data: customer } = useCustomer(customerId)
-  const { data: messages = [], isLoading } = useMessages(customerId)
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useMessages(customerId)
   const { sendMessage } = useChatSocket(customerId)
 
   // Profile panel: closed by default on mobile, open on desktop
@@ -27,7 +35,6 @@ export default function ChatWindow({ customerId, onBack }) {
       setProfileOpen(window.innerWidth >= 768)
     }
   }, [])
-  // Reset when switching customers: open on desktop, close on mobile
   useEffect(() => {
     if (!customerId) return
     if (typeof window !== 'undefined') {
@@ -35,10 +42,63 @@ export default function ChatWindow({ customerId, onBack }) {
     }
   }, [customerId])
 
-  // Auto-scroll to bottom on new message
+  // Flatten pages (newest-first per page) then reverse for chronological display
+  const messages = data?.pages.flatMap((p) => p.results).reverse() ?? []
+
+  // Auto-scroll to bottom on initial load
+  const initialScrollDone = useRef(false)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (!isLoading && messages.length > 0 && !initialScrollDone.current) {
+      initialScrollDone.current = true
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+    }
+  }, [isLoading, messages.length])
+
+  // Reset on customer switch
+  useEffect(() => {
+    initialScrollDone.current = false
+  }, [customerId])
+
+  // Auto-scroll to bottom when a new message arrives (only if near bottom)
+  const prevMsgCount = useRef(0)
+  useEffect(() => {
+    const count = messages.length
+    if (count > prevMsgCount.current && initialScrollDone.current) {
+      const el = scrollRef.current
+      if (el) {
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+        if (distFromBottom < 120) {
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }
+      }
+    }
+    prevMsgCount.current = count
+  }, [messages.length])
+
+  // IntersectionObserver: auto-fetch when top sentinel is visible
+  const loadOlder = useCallback(async () => {
+    if (!hasNextPage || isFetchingNextPage) return
+    const el = scrollRef.current
+    const prevScrollHeight = el?.scrollHeight ?? 0
+    await fetchNextPage()
+    // Restore scroll position so content doesn't jump
+    requestAnimationFrame(() => {
+      if (el) el.scrollTop = el.scrollHeight - prevScrollHeight
+    })
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadOlder()
+      },
+      { root: scrollRef.current, threshold: 0.1 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadOlder])
 
   if (!customerId) {
     return (
@@ -47,7 +107,6 @@ export default function ChatWindow({ customerId, onBack }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4z" />
         </svg>
         <p className="text-text-muted text-sm">Select a conversation to start</p>
-        {/* Mobile only: button to open the sidebar */}
         <button
           onClick={onBack}
           className="md:hidden mt-1 text-xs text-brand border border-brand/30 rounded-full px-4 py-1.5 hover:bg-brand/5 transition-colors"
@@ -65,7 +124,6 @@ export default function ChatWindow({ customerId, onBack }) {
 
         {/* Chat header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface-chat shrink-0">
-          {/* Back button — mobile only */}
           <button
             onClick={onBack}
             className="md:hidden shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] text-text-muted hover:text-text-primary hover:bg-surface-sidebar-item transition-colors"
@@ -98,7 +156,6 @@ export default function ChatWindow({ customerId, onBack }) {
             </div>
           </div>
 
-          {/* Info / profile toggle */}
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className={cn(
@@ -116,10 +173,19 @@ export default function ChatWindow({ customerId, onBack }) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+          {/* Top sentinel — triggers load of older messages when scrolled into view */}
+          <div ref={topSentinelRef} className="h-1" />
+
+          {/* Loading older indicator */}
+          {isFetchingNextPage && (
+            <p className="text-center text-xs text-text-muted py-2">Loading older messages…</p>
+          )}
+
           {isLoading && (
             <p className="text-center text-xs text-text-muted py-8">Loading messages…</p>
           )}
+
           {messages.map((msg, i) => (
             <MessageBubble
               key={msg.id}
@@ -150,9 +216,7 @@ export default function ChatWindow({ customerId, onBack }) {
       {/* Right: Customer profile panel */}
       <div
         className={cn(
-          // Mobile: fixed right drawer
           'fixed inset-y-0 right-0 z-40 transition-transform duration-200',
-          // Desktop: normal layout flow
           'md:static md:inset-auto md:z-auto md:transition-none',
           profileOpen
             ? 'translate-x-0'

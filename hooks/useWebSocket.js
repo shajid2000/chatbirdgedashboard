@@ -113,9 +113,21 @@ export function useChatSocket(customerId, onMessage) {
       },
       onMessage: (data) => {
         if (data.type === 'message') {
-          queryClient.setQueryData(['messages', customerId], (old) =>
-            old ? [...old, data.message] : [data.message]
-          )
+          queryClient.setQueryData(['messages', customerId], (old) => {
+            const newMsg = data.message
+            if (!old) {
+              return {
+                pages: [{ results: [newMsg], next: null, previous: null }],
+                pageParams: [null],
+              }
+            }
+            // Prepend to first page (newest-first order)
+            const [first, ...rest] = old.pages
+            return {
+              ...old,
+              pages: [{ ...first, results: [newMsg, ...first.results] }, ...rest],
+            }
+          })
           onMessage?.(data.message)
         }
       },
@@ -158,6 +170,9 @@ export function useChatSocket(customerId, onMessage) {
 export function useInboxSocket(onUpdate) {
   const socketRef = useRef(null)
   const queryClient = useQueryClient()
+  // Always call the latest callback without recreating the socket
+  const onUpdateRef = useRef(onUpdate)
+  useEffect(() => { onUpdateRef.current = onUpdate })
 
   useEffect(() => {
     socketRef.current = createReconnectingSocket({
@@ -175,21 +190,53 @@ export function useInboxSocket(onUpdate) {
           // - update last_message_at so the row re-renders instantly
           // - bubble the customer to the top (re-sort by last_message_at desc)
           queryClient.setQueriesData({ queryKey: ['customers'] }, (old) => {
-            if (!Array.isArray(old)) return old
-            const updated = old.map((c) =>
-              c.id === customer_id
-                ? { ...c, last_message_at: message.timestamp, _lastMessage: message }
-                : c
-            )
-            return updated.sort(
-              (a, b) => new Date(b.last_message_at) - new Date(a.last_message_at)
-            )
+            if (!old) return old
+            // Infinite query shape: { pages: [...], pageParams: [...] }
+            if (old.pages) {
+              // Extract the customer from wherever they are, update timestamp, move to top
+              let target = null
+              const cleanedPages = old.pages.map((page) => ({
+                ...page,
+                results: page.results.filter((c) => {
+                  if (c.id === customer_id) {
+                    target = { ...c, last_message_at: message.timestamp }
+                    return false
+                  }
+                  return true
+                }),
+              }))
+              if (!target) return old
+              return {
+                ...old,
+                pages: cleanedPages.map((page, i) =>
+                  i === 0 ? { ...page, results: [target, ...page.results] } : page
+                ),
+              }
+            }
+            return old
           })
 
           // Background refetch to sync full server state
           queryClient.invalidateQueries({ queryKey: ['customers'] })
 
-          onUpdate?.(data)
+          onUpdateRef.current?.(data)
+        }
+
+        if (data.type === 'customer_merged') {
+          const { merged_ids } = data
+          // Drop merged secondaries from the cache immediately
+          queryClient.setQueriesData({ queryKey: ['customers'] }, (old) => {
+            if (!old?.pages) return old
+            return {
+              ...old,
+              pages: old.pages.map((page) => ({
+                ...page,
+                results: page.results.filter((c) => !merged_ids.includes(c.id)),
+              })),
+            }
+          })
+          queryClient.invalidateQueries({ queryKey: ['customers'] })
+          onUpdateRef.current?.(data)
         }
       },
     })
