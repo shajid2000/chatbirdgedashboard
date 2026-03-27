@@ -216,9 +216,6 @@ export function useInboxSocket(onUpdate) {
             return old
           })
 
-          // Background refetch to sync full server state
-          queryClient.invalidateQueries({ queryKey: ['customers'] })
-
           onUpdateRef.current?.(data)
         }
 
