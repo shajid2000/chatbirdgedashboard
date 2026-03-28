@@ -230,6 +230,47 @@ export default function CustomerProfile({ customerId, onClose }) {
 
       <Separator className="bg-border-default" />
 
+      {/* AI auto-reply toggle */}
+      <div className="px-4 py-3">
+        <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide mb-2">AI Auto-reply</p>
+        <div className="flex gap-1.5">
+          {[
+            { value: null,  label: 'Default' },
+            { value: true,  label: 'On' },
+            { value: false, label: 'Off' },
+          ].map(({ value, label }) => {
+            const active = customer.ai_enabled === value
+            return (
+              <button
+                key={String(value)}
+                onClick={async () => {
+                  try {
+                    await updateCustomer.mutateAsync({ ai_enabled: value })
+                  } catch {
+                    toast.error('Failed to update AI setting.')
+                  }
+                }}
+                className="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                style={{
+                  borderColor: active ? 'hsl(var(--color-brand))' : 'hsl(var(--border-default))',
+                  color: active ? 'hsl(var(--color-brand))' : 'hsl(var(--text-muted))',
+                  backgroundColor: active ? 'hsl(var(--color-brand) / 0.08)' : 'transparent',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-text-muted mt-1.5">
+          {customer.ai_enabled === true  && 'AI will always reply to this customer.'}
+          {customer.ai_enabled === false && 'AI will never reply to this customer.'}
+          {customer.ai_enabled === null  && 'Follows the business AI setting.'}
+        </p>
+      </div>
+
+      <Separator className="bg-border-default" />
+
       {/* Channel identities */}
       <div className="px-4 py-3">
         <p className="text-[11px] font-medium text-text-muted uppercase tracking-wide mb-2">Connected on</p>
