@@ -228,6 +228,19 @@ export function useInboxSocket(onUpdate) {
           onUpdateRef.current?.(data)
         }
 
+        if (data.type === 'new_customer') {
+          const { customer } = data
+          queryClient.setQueriesData({ queryKey: ['customers'] }, (old) => {
+            if (!old?.pages) return old
+            const [first, ...rest] = old.pages
+            return {
+              ...old,
+              pages: [{ ...first, results: [customer, ...first.results] }, ...rest],
+            }
+          })
+          onUpdateRef.current?.(data)
+        }
+
         if (data.type === 'customer_merged') {
           const { merged_ids } = data
           // Drop merged secondaries from the cache immediately
