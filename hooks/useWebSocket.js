@@ -98,9 +98,11 @@ function createReconnectingSocket({ getUrl, onMessage, onOpen, onClose }) {
  * WebSocket for a specific customer chat thread.
  * Auto-disconnects when tab is hidden, reconnects on focus.
  */
-export function useChatSocket(customerId, onMessage) {
+export function useChatSocket(customerId, { onMessage, onTyping } = {}) {
   const socketRef = useRef(null)
   const queryClient = useQueryClient()
+  const onTypingRef = useRef(onTyping)
+  useEffect(() => { onTypingRef.current = onTyping })
 
   useEffect(() => {
     if (!customerId) return
@@ -130,6 +132,9 @@ export function useChatSocket(customerId, onMessage) {
           })
           onMessage?.(data.message)
         }
+        if (data.type === 'typing') {
+          onTypingRef.current?.()
+        }
       },
     })
 
@@ -155,11 +160,15 @@ export function useChatSocket(customerId, onMessage) {
   }, [customerId])
 
   const sendMessage = useCallback((content, channelId = null) => {
-    console.log('[WS] sending message', { content, channelId },socketRef.current)
+    console.log('[WS] sending message', { content, channelId }, socketRef.current)
     socketRef.current?.send({ content, channel_id: channelId })
   }, [])
 
-  return { sendMessage }
+  const sendTyping = useCallback(() => {
+    socketRef.current?.send({ type: 'typing' })
+  }, [])
+
+  return { sendMessage, sendTyping }
 }
 
 /**

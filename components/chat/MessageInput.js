@@ -1,16 +1,28 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useChannels } from '@/hooks/useChannels'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 
-export default function MessageInput({ customerId, lastChannelType, lastChannelId, onSend }) {
+export default function MessageInput({ customerId, lastChannelType, lastChannelId, onSend, onType }) {
   const [content, setContent] = useState('')
   const [sending, setSending] = useState(false)
   const [selectedChannelId, setSelectedChannelId] = useState(null)
   const [showChannelPicker, setShowChannelPicker] = useState(false)
   const textareaRef = useRef(null)
   const pickerRef = useRef(null)
+  const lastTypingSentRef = useRef(0)
+
+  const handleType = useCallback((e) => {
+    setContent(e.target.value)
+    if (onType) {
+      const now = Date.now()
+      if (now - lastTypingSentRef.current > 2000) {
+        lastTypingSentRef.current = now
+        onType()
+      }
+    }
+  }, [onType])
 
   const { data: channels = [] } = useChannels()
 
@@ -124,7 +136,7 @@ export default function MessageInput({ customerId, lastChannelType, lastChannelI
         <textarea
           ref={textareaRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleType}
           onKeyDown={handleKeyDown}
           placeholder="Type a message…"
           rows={1}

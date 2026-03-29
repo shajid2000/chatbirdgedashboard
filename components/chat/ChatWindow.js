@@ -26,7 +26,17 @@ export default function ChatWindow({ customerId, onBack }) {
     hasNextPage,
     isFetchingNextPage,
   } = useMessages(customerId)
-  const { sendMessage } = useChatSocket(customerId)
+  // Customer typing indicator
+  const [customerTyping, setCustomerTyping] = useState(false)
+  const typingTimerRef = useRef(null)
+  const handleCustomerTyping = useCallback(() => {
+    setCustomerTyping(true)
+    clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => setCustomerTyping(false), 3000)
+  }, [])
+  useEffect(() => () => clearTimeout(typingTimerRef.current), [])
+
+  const { sendMessage, sendTyping } = useChatSocket(customerId, { onTyping: handleCustomerTyping })
 
   // Profile panel: closed by default on mobile, open on desktop
   const [profileOpen, setProfileOpen] = useState(false)
@@ -74,6 +84,19 @@ export default function ChatWindow({ customerId, onBack }) {
     }
     prevMsgCount.current = count
   }, [messages.length])
+
+  // Scroll to bottom when typing indicator appears
+  useEffect(() => {
+    if (customerTyping && initialScrollDone.current) {
+      const el = scrollRef.current
+      if (el) {
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+        if (distFromBottom < 120) {
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        }
+      }
+    }
+  }, [customerTyping])
 
   // IntersectionObserver: auto-fetch when top sentinel is visible
   const loadOlder = useCallback(async () => {
@@ -193,6 +216,17 @@ export default function ChatWindow({ customerId, onBack }) {
               prevMessage={messages[i - 1]}
             />
           ))}
+
+          {customerTyping && (
+            <div className="flex items-end gap-2 self-start">
+              <div className="bg-surface-sidebar rounded-[4px_16px_16px_16px] px-3 py-2.5 flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -202,6 +236,7 @@ export default function ChatWindow({ customerId, onBack }) {
           lastChannelType={customer?.last_channel_type}
           lastChannelId={customer?.last_channel_id}
           onSend={sendMessage}
+          onType={sendTyping}
         />
       </div>
 
