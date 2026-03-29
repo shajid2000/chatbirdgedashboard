@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/hooks/useAuth'
+import { usePermission } from '@/hooks/usePermission'
 import api from '@/lib/api'
 
 function initials(name) {
@@ -28,7 +29,7 @@ function useTeamMembers() {
 
 export default function TeamPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = usePermission('team.invite')
   const { data: members = [], isLoading } = useTeamMembers()
   const queryClient = useQueryClient()
 
