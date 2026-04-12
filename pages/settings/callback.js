@@ -1,33 +1,91 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import api from '@/lib/api'
+import {
+  clearPendingSourceOAuth,
+  getPendingSourceOAuth,
+  setSourceOAuthResult,
+} from '@/lib/sourceOAuth'
 
 /**
- * OAuth popup callback page.
- * Meta redirects here after the user completes the OAuth flow.
- * This page posts the full URL (including ?code=...) back to the opener,
- * then closes itself.
- *
- * Configure your Meta app redirect_uri as:
- *   http://localhost:3000/settings/callback   (dev)
- *   https://yourdomain.com/settings/callback  (prod)
+ * OAuth callback page.
+ * Supports both:
+ * 1. Legacy popup flow via window.opener + postMessage
+ * 2. Default same-tab redirect flow that completes the exchange here
  */
 export default function OAuthCallback() {
+  const [message, setMessage] = useState('Completing authorization...')
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    try {
-      const source = localStorage.getItem('oauth_pending_source') ?? null
-      localStorage.removeItem('oauth_pending_source')
-      window.opener?.postMessage(
-        { type: 'meta_oauth_callback', url: window.location.href, source },
-        window.location.origin,
-      )
-    } catch (_) {
-      // opener may be on a different origin in some edge cases — ignore
+    let closeTimer = null
+
+    const run = async () => {
+      const pending = getPendingSourceOAuth()
+      const source = pending?.source ?? null
+      const returnPath = pending?.returnPath || '/settings/channels'
+      const params = new URLSearchParams(window.location.search)
+
+      if (window.opener && source) {
+        try {
+          window.opener.postMessage(
+            { type: 'meta_oauth_callback', url: window.location.href, source },
+            window.location.origin,
+          )
+        } catch (_) {
+          // ignore popup postMessage failures
+        }
+        closeTimer = setTimeout(() => window.close(), 500)
+        return
+      }
+
+      if (!pending || !source) {
+        setMessage('No pending connection was found. You can close this page.')
+        return
+      }
+
+      if (params.get('error') === 'access_denied') {
+        clearPendingSourceOAuth()
+        setSourceOAuthResult({
+          source,
+          status: 'error',
+          detail: 'Authorization was cancelled.',
+        })
+        setMessage('Authorization cancelled. Returning...')
+        window.location.replace(returnPath)
+        return
+      }
+
+      try {
+        const { data } = await api.post('/sources/connect/', {
+          source,
+          auth_code: window.location.href,
+        })
+        clearPendingSourceOAuth()
+        setSourceOAuthResult({
+          source,
+          status: 'success',
+          ...data,
+        })
+        setMessage('Authorization complete. Returning...')
+        window.location.replace(returnPath)
+      } catch (error) {
+        clearPendingSourceOAuth()
+        setSourceOAuthResult({
+          source,
+          status: 'error',
+          detail: error.response?.data?.detail || 'Failed to complete authorization.',
+        })
+        setMessage('Authorization failed. Returning...')
+        window.location.replace(returnPath)
+      }
     }
 
-    // Give the parent a moment to receive the message, then close
-    const t = setTimeout(() => window.close(), 500)
-    return () => clearTimeout(t)
+    run()
+
+    return () => {
+      if (closeTimer) clearTimeout(closeTimer)
+    }
   }, [])
 
   return (
@@ -37,8 +95,8 @@ export default function OAuthCallback() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </div>
-      <h1 className="text-base font-semibold text-gray-800 mb-1">Authorization complete</h1>
-      <p className="text-sm text-gray-500">You can close this window.</p>
+      <h1 className="text-base font-semibold text-gray-800 mb-1">Authorization in progress</h1>
+      <p className="text-sm text-gray-500">{message}</p>
     </div>
   )
 }

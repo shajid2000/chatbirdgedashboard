@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import SettingsLayout from '@/components/settings/SettingsLayout'
@@ -16,6 +16,11 @@ import {
   useDisconnectSource,
 } from '@/hooks/useSourceConnections'
 import api from '@/lib/api'
+import {
+  clearSourceOAuthResult,
+  getSourceOAuthResult,
+  setPendingSourceOAuth,
+} from '@/lib/sourceOAuth'
 
 function useChannelTypes() {
   return useQuery({
@@ -39,27 +44,31 @@ function useAllChannels() {
 
 // ─── Page picker modal ────────────────────────────────────────────────────────
 
-function PagePickerModal({ pages, onSelect, onClose }) {
+function PagePickerModal({ items, title, description, onSelect, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
         <div className="px-6 py-5 border-b border-border-default">
-          <h2 className="text-base font-semibold text-text-primary">Choose a Facebook Page</h2>
-          <p className="text-xs text-text-muted mt-1">Select the page to connect to your inbox.</p>
+          <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+          <p className="text-xs text-text-muted mt-1">{description}</p>
         </div>
         <div className="divide-y divide-border-default max-h-72 overflow-y-auto">
-          {pages.map((page) => (
+          {items.map((item) => (
             <button
-              key={page.id}
-              onClick={() => onSelect(page)}
+              key={item.instagram_account_id || item.id}
+              onClick={() => onSelect(item)}
               className="w-full flex items-center gap-3 px-6 py-4 hover:bg-surface-app text-left transition-colors"
             >
               <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
-                {page.name?.[0]?.toUpperCase() ?? 'P'}
+                {(item.instagram_username || item.page_name || item.name)?.[0]?.toUpperCase() ?? 'A'}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">{page.name}</p>
-                <p className="text-xs text-text-muted">ID: {page.id}</p>
+                <p className="text-sm font-medium text-text-primary truncate">
+                  {item.instagram_username ? `@${item.instagram_username}` : item.page_name || item.name}
+                </p>
+                <p className="text-xs text-text-muted truncate">
+                  {item.instagram_name || item.page_name || 'Meta account'}
+                </p>
               </div>
             </button>
           ))}
@@ -75,6 +84,15 @@ function PagePickerModal({ pages, onSelect, onClose }) {
 // ─── Source connection card ───────────────────────────────────────────────────
 
 const SOURCE_META = {
+  instagram: {
+    label: 'Instagram Messaging',
+    color: '#E1306C',
+    icon: (
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#E1306C">
+        <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5a4.25 4.25 0 0 0 4.25 4.25h8.5a4.25 4.25 0 0 0 4.25-4.25v-8.5a4.25 4.25 0 0 0-4.25-4.25Zm8.9 1.15a.95.95 0 1 1 0 1.9.95.95 0 0 1 0-1.9ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z" />
+      </svg>
+    ),
+  },
   'facebook.com': {
     label: 'Facebook Messenger',
     color: '#0099FF',
@@ -122,7 +140,8 @@ function SourceConnectionCard({ connection }) {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary">{meta.label}</p>
-          {connection.page_name && <p className="text-xs text-text-muted truncate">Page: {connection.page_name}</p>}
+          {connection.source === 'instagram' && connection.page_name && <p className="text-xs text-text-muted truncate">Account: @{connection.page_name}</p>}
+          {connection.source !== 'instagram' && connection.page_name && <p className="text-xs text-text-muted truncate">Page: {connection.page_name}</p>}
           {connection.waba_name && <p className="text-xs text-text-muted truncate">WABA: {connection.waba_name}</p>}
           {connection.business_manager_name && <p className="text-xs text-text-muted truncate">Business: {connection.business_manager_name}</p>}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -160,62 +179,64 @@ function OAuthConnectButton({ source, label, icon, disabled }) {
   const connectSource = useConnectSource()
   const assignSource = useAssignSource()
   const [loading, setLoading] = useState(false)
-  const [pages, setPages] = useState(null)
-  const popupRef = useRef(null)
+  const [selectionState, setSelectionState] = useState(null)
 
   useEffect(() => {
-    const handler = async (event) => {
-      if (event.origin !== window.location.origin) return
-      if (event.data?.type !== 'meta_oauth_callback') return
-      if (event.data?.source !== source) return
-      const fullUrl = event.data.url
-      if (!fullUrl) return
-      setLoading(true)
-      try {
-        const result = await connectSource.mutateAsync({ source, auth_code: fullUrl })
-        if (result.facebook_pages?.length > 1) {
-          setPages(result.facebook_pages)
-        } else {
-          toast.success(`${label} connected successfully!`)
-        }
-      } catch (err) {
-        toast.error(err.response?.data?.detail || `Failed to connect ${label}.`)
-      } finally {
-        setLoading(false)
+    const result = getSourceOAuthResult()
+    if (!result || result.source !== source) return
+
+    clearSourceOAuthResult()
+
+    if (result.status === 'success') {
+      if (result.facebook_pages?.length > 1) {
+        setSelectionState({
+          title: 'Choose a Facebook Page',
+          description: 'Select the page to connect to your inbox.',
+          items: result.facebook_pages,
+        })
+      } else if (result.instagram_accounts?.length > 1) {
+        setSelectionState({
+          title: 'Choose an Instagram Account',
+          description: 'Select the professional Instagram account to connect.',
+          items: result.instagram_accounts,
+        })
+      } else {
+        toast.success(`${label} connected successfully!`)
       }
+      return
     }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
-  }, [source, label]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    toast.error(result.detail || `Failed to connect ${label}.`)
+  }, [source, label])
 
   const handleConnect = async () => {
     setLoading(true)
     try {
       const { login_url } = await connectSource.mutateAsync({ source })
-      const width = 600, height = 700
-      const left = window.screenX + (window.outerWidth - width) / 2
-      const top = window.screenY + (window.outerHeight - height) / 2
-      localStorage.setItem('oauth_pending_source', source)
-      popupRef.current = window.open(login_url, 'meta-oauth', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`)
+      if (!login_url) throw new Error('OAuth login URL was not returned.')
+      setPendingSourceOAuth({
+        source,
+        returnPath: '/settings/channels',
+      })
+      window.location.assign(login_url)
+      return
     } catch (err) {
-      toast.error(err.response?.data?.detail || `Failed to start ${label} connection.`)
+      toast.error(err.response?.data?.detail || err.message || `Failed to start ${label} connection.`)
       setLoading(false)
     }
-    const t = setTimeout(() => setLoading(false), 120_000)
-    return () => clearTimeout(t)
   }
 
-  const handlePageSelect = async (page) => {
-    setPages(null)
+  const handleSelection = async (item) => {
+    setSelectionState(null)
     setLoading(true)
     try {
       await assignSource.mutateAsync({
         source,
-        properties: [{ item: { page_id: page.id, page_name: page.name, page_token: page.access_token } }],
+        properties: [{ item }],
       })
-      toast.success(`${label} connected via "${page.name}".`)
+      toast.success(`${label} connected successfully.`)
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to assign page.')
+      toast.error(err.response?.data?.detail || 'Failed to assign account.')
     } finally {
       setLoading(false)
     }
@@ -233,7 +254,7 @@ function OAuthConnectButton({ source, label, icon, disabled }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-text-primary">{label}</p>
-          <p className="text-xs text-text-muted">Connect via Meta OAuth</p>
+          <p className="text-xs text-text-muted">{source === 'instagram' ? 'Connect via Instagram Login' : 'Connect via Meta OAuth'}</p>
         </div>
         {loading ? (
           <svg className="w-4 h-4 text-text-muted animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
@@ -246,7 +267,15 @@ function OAuthConnectButton({ source, label, icon, disabled }) {
           </svg>
         )}
       </button>
-      {pages && <PagePickerModal pages={pages} onSelect={handlePageSelect} onClose={() => setPages(null)} />}
+      {selectionState && (
+        <PagePickerModal
+          items={selectionState.items}
+          title={selectionState.title}
+          description={selectionState.description}
+          onSelect={handleSelection}
+          onClose={() => setSelectionState(null)}
+        />
+      )}
     </>
   )
 }
@@ -349,8 +378,8 @@ export default function ChannelsSettingsPage() {
   const { data: sourceConnections = [], isLoading: loadingConns } = useSourceConnections()
 
   const connectedSources = new Set(sourceConnections.map((c) => c.source))
-  const manualChannelTypes = channelTypes.filter((ct) => !['whatsapp', 'messenger'].includes(ct.key))
-  const manualChannels = channels.filter((ch) => !['whatsapp', 'messenger'].includes(ch.channel_type?.key))
+  const manualChannelTypes = channelTypes.filter((ct) => !['whatsapp', 'instagram', 'messenger'].includes(ct.key))
+  const manualChannels = channels.filter((ch) => !['whatsapp', 'instagram', 'messenger'].includes(ch.channel_type?.key))
 
   return (
     <SettingsLayout>
@@ -363,7 +392,7 @@ export default function ChannelsSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Meta Business Accounts</CardTitle>
-          <CardDescription>Connect WhatsApp Business or Facebook Messenger via Meta's secure OAuth flow.</CardDescription>
+          <CardDescription>Connect WhatsApp, Instagram, or Facebook Messenger via Meta's secure OAuth flow.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {loadingConns ? (
@@ -382,6 +411,13 @@ export default function ChannelsSettingsPage() {
                 icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" /></svg>}
               />
             )}
+            {!connectedSources.has('instagram') && (
+              <OAuthConnectButton
+                source="instagram"
+                label="Instagram Messaging"
+                icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="#E1306C"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5a4.25 4.25 0 0 0 4.25 4.25h8.5a4.25 4.25 0 0 0 4.25-4.25v-8.5a4.25 4.25 0 0 0-4.25-4.25Zm8.9 1.15a.95.95 0 1 1 0 1.9.95.95 0 0 1 0-1.9ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z" /></svg>}
+              />
+            )}
             {!connectedSources.has('facebook.com') && (
               <OAuthConnectButton
                 source="facebook.com"
@@ -389,7 +425,7 @@ export default function ChannelsSettingsPage() {
                 icon={<svg className="w-5 h-5" viewBox="0 0 24 24" fill="#0099FF"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.3 2.246.464 3.443.464 6.627 0 12-4.975 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8.1l3.131 3.26L19.752 8.1l-6.561 6.863z" /></svg>}
               />
             )}
-            {connectedSources.has('whatsapp') && connectedSources.has('facebook.com') && (
+            {connectedSources.has('whatsapp') && connectedSources.has('instagram') && connectedSources.has('facebook.com') && (
               <p className="text-xs text-text-muted text-center py-1">All Meta accounts connected.</p>
             )}
           </Can>
@@ -400,7 +436,7 @@ export default function ChannelsSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Other Channels</CardTitle>
-          <CardDescription>Connect Instagram, Web Chat, or Email manually.</CardDescription>
+          <CardDescription>Connect Web Chat or Email manually.</CardDescription>
         </CardHeader>
         <CardContent>
           {manualChannels.length > 0 && (
