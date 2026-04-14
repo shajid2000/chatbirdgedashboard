@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useInfiniteCustomers } from '@/hooks/useCustomers'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 import { customerDisplayName, customerInitials } from '@/lib/utils'
@@ -158,6 +158,9 @@ export default function InboxSidebar({ user, selectedCustomerId, onSelectCustome
               }`}
             >
               <Avatar className="h-9 w-9 shrink-0 mt-0.5">
+                {customer.avatar_url ? (
+                  <AvatarImage src={customer.avatar_url} alt={customerDisplayName(customer)} />
+                ) : null}
                 <AvatarFallback className="bg-brand/20 text-brand text-xs font-medium">
                   {customerInitials(customer)}
                 </AvatarFallback>
