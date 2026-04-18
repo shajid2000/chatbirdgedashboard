@@ -146,3 +146,30 @@
     @apply bg-surface-app text-text-primary font-sans;
   }
 }
+
+/* ── WhatsApp-style thin scrollbar ─────────────────────────── */
+.scrollbar-thin-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+}
+.scrollbar-thin-sidebar:hover {
+  scrollbar-color: hsl(var(--border-sidebar) / 0.6) transparent;
+}
+.scrollbar-thin-sidebar::-webkit-scrollbar {
+  width: 3px;
+}
+.scrollbar-thin-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin-sidebar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+.scrollbar-thin-sidebar:hover::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-sidebar) / 0.6);
+}
+.scrollbar-thin-sidebar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--border-sidebar));
+}

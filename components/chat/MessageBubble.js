@@ -5,6 +5,32 @@ function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function ReadTick({ isRead }) {
+  const color = isRead ? 'var(--color-primary, #6366f1)' : '#9ca3af'
+  const label = isRead ? 'Read' : 'Sent'
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex items-center flex-shrink-0" aria-label={label}>
+          {/* First tick */}
+          <svg width="11" height="8" viewBox="0 0 11 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 4L3.5 6.5L9 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {/* Second tick — only shown when read */}
+          {isRead && (
+            <svg width="11" height="8" viewBox="0 0 11 8" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginLeft: '-5px' }}>
+              <path d="M1 4L3.5 6.5L9 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        <p className="text-xs">{label}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 function isSameGroup(msg, prev) {
   if (!prev) return false
   return (
@@ -83,11 +109,14 @@ export default function MessageBubble({ message, prevMessage }) {
         {hasError && <ErrorIcon error={message.send_error} />}
       </div>
 
-      {/* Timestamp */}
-      <span className="text-[10px] text-text-muted mt-0.5 px-1">
-        {formatTime(message.timestamp)}
-        {hasError && <span className="text-red-400 ml-1">· not delivered</span>}
-      </span>
+      {/* Timestamp + read tick */}
+      <div className={`flex items-center gap-1 mt-0.5 px-1 ${isOut ? 'flex-row-reverse' : ''}`}>
+        <span className="text-[10px] text-text-muted">
+          {formatTime(message.timestamp)}
+          {hasError && <span className="text-red-400 ml-1">· not delivered</span>}
+        </span>
+        {isOut && !hasError && <ReadTick isRead={message.is_read} />}
+      </div>
     </div>
   )
 }

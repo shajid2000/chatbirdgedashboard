@@ -133,7 +133,7 @@ export default function InboxSidebar({ user, selectedCustomerId, onSelectCustome
       </div>
 
       {/* Customer list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-thin-sidebar">
         {isLoading && (
           <p className="text-xs text-text-sidebar-muted text-center py-8">Loading…</p>
         )}
