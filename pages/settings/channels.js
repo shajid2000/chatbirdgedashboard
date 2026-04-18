@@ -132,17 +132,58 @@ function SourceConnectionCard({ connection }) {
     }
   }
 
+  const profilePic = connection.source === 'instagram' && connection.extra_fields?.profile_picture_url
+
   return (
     <div className="flex items-start justify-between gap-4 py-4">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface-app border border-border-default shrink-0">
-          {meta.icon}
+        {/* Avatar: profile pic for Instagram, platform icon otherwise */}
+        <div className="relative shrink-0">
+          {profilePic ? (
+            <>
+              <img
+                src={profilePic}
+                alt={connection.page_name || 'Instagram'}
+                className="w-10 h-10 rounded-full object-cover border border-border-default"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+              />
+              {/* Fallback shown if img fails */}
+              <div className="w-10 h-10 rounded-xl items-center justify-center bg-surface-app border border-border-default hidden">
+                {meta.icon}
+              </div>
+              {/* Small Instagram badge overlay */}
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border border-border-default flex items-center justify-center">
+                <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="#E1306C">
+                  <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2Zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5a4.25 4.25 0 0 0 4.25 4.25h8.5a4.25 4.25 0 0 0 4.25-4.25v-8.5a4.25 4.25 0 0 0-4.25-4.25Zm8.9 1.15a.95.95 0 1 1 0 1.9.95.95 0 0 1 0-1.9ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 1.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z" />
+                </svg>
+              </div>
+            </>
+          ) : (
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface-app border border-border-default">
+              {meta.icon}
+            </div>
+          )}
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary">{meta.label}</p>
-          {connection.source === 'instagram' && connection.page_name && <p className="text-xs text-text-muted truncate">Account: @{connection.page_name}</p>}
-          {connection.source !== 'instagram' && connection.page_name && <p className="text-xs text-text-muted truncate">Page: {connection.page_name}</p>}
-          {connection.waba_name && <p className="text-xs text-text-muted truncate">WABA: {connection.waba_name}</p>}
+          {connection.source === 'instagram' && (connection.extra_fields?.username || connection.page_name) && (
+            <p className="text-xs text-text-muted truncate">@{connection.extra_fields?.username || connection.page_name}</p>
+          )}
+          {connection.source === 'instagram' && connection.page_id && (
+            <p className="text-[11px] text-text-muted font-mono truncate">ID: {connection.page_id}</p>
+          )}
+          {connection.source === 'facebook.com' && connection.page_name && (
+            <p className="text-xs text-text-muted truncate">Page: {connection.page_name}</p>
+          )}
+          {connection.source === 'facebook.com' && connection.page_id && (
+            <p className="text-[11px] text-text-muted font-mono truncate">Page ID: {connection.page_id}</p>
+          )}
+          {connection.source === 'whatsapp' && connection.waba_name && (
+            <p className="text-xs text-text-muted truncate">WABA: {connection.waba_name}</p>
+          )}
+          {connection.source === 'whatsapp' && connection.waba_id && (
+            <p className="text-[11px] text-text-muted font-mono truncate">WABA ID: {connection.waba_id}</p>
+          )}
           {connection.business_manager_name && <p className="text-xs text-text-muted truncate">Business: {connection.business_manager_name}</p>}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-50 text-green-600">Connected</span>
