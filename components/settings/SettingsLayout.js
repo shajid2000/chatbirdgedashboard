@@ -23,6 +23,16 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    href: '/settings/knowledge',
+    label: 'Knowledge Base',
+    description: 'Documents, FAQs, policies',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+      </svg>
+    ),
+  },
 ]
 
 export default function SettingsLayout({ children }) {
@@ -30,10 +40,36 @@ export default function SettingsLayout({ children }) {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-1 h-full overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 h-full overflow-hidden">
 
-        {/* ── Settings sidebar ── */}
-        <aside className="w-56 shrink-0 border-r border-border-default bg-surface-app flex flex-col">
+        {/* ── Mobile: horizontal tab nav ── */}
+        <div className="md:hidden shrink-0 border-b border-border-default bg-surface-app">
+          <div className="px-4 pt-3 pb-0">
+            <h1 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Settings</h1>
+          </div>
+          <nav className="flex overflow-x-auto px-3 pt-1 gap-0.5">
+            {NAV.map(({ href, label, icon }) => {
+              const active = pathname === href
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    active
+                      ? 'border-brand text-brand'
+                      : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <span className="shrink-0">{icon}</span>
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+
+        {/* ── Desktop: sidebar ── */}
+        <aside className="hidden md:flex w-56 shrink-0 border-r border-border-default bg-surface-app flex-col">
           <div className="px-5 py-5 border-b border-border-default">
             <h1 className="text-sm font-semibold text-text-primary">Settings</h1>
             <p className="text-xs text-text-muted mt-0.5">Manage your workspace</p>
@@ -70,7 +106,7 @@ export default function SettingsLayout({ children }) {
 
         {/* ── Page content ── */}
         <main className="flex-1 overflow-y-auto bg-surface-app">
-          <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
             {children}
           </div>
         </main>
