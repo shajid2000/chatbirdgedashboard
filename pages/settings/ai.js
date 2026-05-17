@@ -6,18 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { useAIConfig, useUpdateAIConfig } from '@/hooks/useAIConfig'
+import { useAIConfig, useUpdateAIConfig, useAIConfigForm } from '@/hooks/useAIConfig'
 import { usePermissions } from '@/hooks/usePermission'
 
-const PROVIDERS = [
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openai', label: 'OpenAI' },
-]
-
-const DEFAULT_MODELS = {
-  gemini: 'gemini-2.0-flash',
-  openai: 'gpt-4o-mini',
-}
 
 function Toggle({ checked, onChange, disabled }) {
   return (
@@ -37,8 +28,11 @@ function Toggle({ checked, onChange, disabled }) {
 
 export default function AISettingsPage() {
   const { data: config, isLoading } = useAIConfig()
+  const { data: formOptions } = useAIConfigForm()
   const update = useUpdateAIConfig()
   const perms = usePermissions(['ai.view', 'ai.toggle', 'ai.configure'])
+
+  const providers = formOptions?.providers ?? []
 
   const [form, setForm] = useState(null)
   const [showKey, setShowKey] = useState(false)
@@ -80,7 +74,7 @@ export default function AISettingsPage() {
 
   function handleProviderChange(e) {
     const provider = e.target.value
-    setForm((f) => ({ ...f, provider, model_name: DEFAULT_MODELS[provider] ?? '' }))
+    setForm((f) => ({ ...f, provider, model_name: '' }))
   }
 
   if (isLoading) return <SettingsLayout><div /></SettingsLayout>
@@ -148,9 +142,10 @@ export default function AISettingsPage() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-md)] bg-surface-app border border-border-default text-xs text-text-secondary">
           <span className={`w-2 h-2 rounded-full shrink-0 ${config.enabled ? 'bg-green-500' : 'bg-gray-300'}`} />
           <span>
-            {config.enabled
-              ? `AI is active · ${config.provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} · ${config.model_name}`
-              : `AI is disabled · ${config.provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} · ${config.model_name}`}
+            {(() => {
+              const providerLabel = providers.find((p) => p.value === config.provider)?.label ?? config.provider
+              return `${config.enabled ? 'AI is active' : 'AI is disabled'} · ${providerLabel} · ${config.model_name}`
+            })()}
           </span>
         </div>
       )}
@@ -172,7 +167,7 @@ export default function AISettingsPage() {
                   onChange={handleProviderChange}
                   className="w-full text-sm rounded-[var(--radius-sm)] border border-border-default bg-white px-3 py-2 text-text-primary focus:outline-none focus:ring-1 focus:ring-brand"
                 >
-                  {PROVIDERS.map((p) => (
+                  {providers.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
                 </select>
@@ -209,12 +204,12 @@ export default function AISettingsPage() {
               <div className="space-y-1.5">
                 <Label>Model</Label>
                 <Input
-                  placeholder={DEFAULT_MODELS[form.provider] ?? ''}
+                  placeholder="e.g. gemini-2.0-flash"
                   value={form.model_name}
                   onChange={set('model_name')}
                 />
                 <p className="text-[11px] text-text-muted">
-                  {form.provider === 'gemini' ? 'e.g. gemini-2.0-flash, gemini-1.5-pro' : 'e.g. gpt-4o-mini, gpt-4o'}
+                  Enter the provider model ID (e.g. {providers.find((p) => p.value === form.provider)?.label ?? form.provider}).
                 </p>
               </div>
 

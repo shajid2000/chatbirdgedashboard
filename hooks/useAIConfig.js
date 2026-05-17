@@ -1,6 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
+export function useAIConfigForm() {
+  return useQuery({
+    queryKey: ['ai-config-form'],
+    queryFn: async () => {
+      const { data } = await api.get('/ai/config/form/')
+      return data
+    },
+    staleTime: Infinity,
+  })
+}
+
 export function useAIConfig() {
   return useQuery({
     queryKey: ['ai-config'],

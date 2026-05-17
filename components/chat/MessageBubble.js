@@ -35,6 +35,7 @@ function isSameGroup(msg, prev) {
   if (!prev) return false
   return (
     msg.speaker === prev.speaker &&
+    msg.channel_type === prev.channel_type &&
     Math.abs(new Date(msg.timestamp) - new Date(prev.timestamp)) < 60_000 * 3
   )
 }
