@@ -235,6 +235,7 @@ export default function ChatWindow({ customerId, onBack }) {
           customerId={customerId}
           lastChannelType={customer?.last_channel_type}
           lastChannelId={customer?.last_channel_id}
+          channelIdentities={customer?.channel_identities}
           onSend={sendMessage}
           onType={sendTyping}
         />

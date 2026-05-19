@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useChannels } from '@/hooks/useChannels'
 import ChannelBadge from '@/components/shared/ChannelBadge'
 
-export default function MessageInput({ customerId, lastChannelType, lastChannelId, onSend, onType }) {
+export default function MessageInput({ customerId, lastChannelType, lastChannelId, channelIdentities, onSend, onType }) {
   const [content, setContent] = useState('')
   const [sending, setSending] = useState(false)
   const [selectedChannelId, setSelectedChannelId] = useState(null)
@@ -24,7 +24,12 @@ export default function MessageInput({ customerId, lastChannelType, lastChannelI
     }
   }, [onType])
 
-  const { data: channels = [] } = useChannels()
+  const { data: allChannels = [] } = useChannels()
+
+  const connectedTypes = new Set((channelIdentities || []).map((ci) => ci.channel_type))
+  const channels = channelIdentities?.length
+    ? allChannels.filter((ch) => connectedTypes.has(ch.channel_type.key))
+    : allChannels
 
   // Default to customer's last channel
   const selectedChannel = channels.find((c) => c.id === selectedChannelId)
